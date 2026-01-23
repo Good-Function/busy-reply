@@ -24,9 +24,10 @@ jobs:
     - name: Set up Android SDK
       uses: android-actions/setup-android@v3
       with:
-        api-level: 33      # specify to avoid defaulting every run
-        build-tools-version: 33.0.2  # pin build tools version
-        system-image: google_apis/x86_64
+        packages: |
+          platforms;android-33
+          build-tools;33.0.2
+          system-images;android-33;google_apis;x86_64
 
     - name: Grant execute permission for gradlew
       run: chmod +x ./gradlew
