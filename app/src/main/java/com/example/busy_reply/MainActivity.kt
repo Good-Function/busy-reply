@@ -1,10 +1,14 @@
 package com.example.busy_reply
 
+import android.app.role.RoleManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
@@ -29,17 +34,26 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.example.busy_reply.ui.theme.BusyreplyTheme
 import kotlinx.coroutines.launch
 
-private const val PREFS_NAME = "busy_reply_prefs"
-private const val KEY_SAVED_TEXT = "saved_text"
+private val BUSY_REPLY_PERMISSIONS = arrayOf(
+    android.Manifest.permission.READ_PHONE_STATE,
+    android.Manifest.permission.SEND_SMS
+)
 
 class MainActivity : ComponentActivity() {
+
+    private val requestPermissionsLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ -> }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestPermissionsIfNeeded()
         setContent {
             BusyreplyTheme {
                 val snackbarHostState = remember { SnackbarHostState() }
@@ -51,24 +65,41 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding),
-                        snackbarHostState = snackbarHostState
+                        snackbarHostState = snackbarHostState,
+                        onRequestCallScreeningRole = { requestCallScreeningRole() }
                     )
                 }
             }
         }
+    }
+
+    private fun requestPermissionsIfNeeded() {
+        val missing = BUSY_REPLY_PERMISSIONS.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isNotEmpty()) requestPermissionsLauncher.launch(missing.toTypedArray())
+    }
+
+    private fun requestCallScreeningRole() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val roleManager = getSystemService(Context.ROLE_SERVICE) as? RoleManager ?: return
+        if (!roleManager.isRoleAvailable(RoleManager.ROLE_CALL_SCREENING)) return
+        if (roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)) return
+        startActivity(roleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
     }
 }
 
 @Composable
 fun PersistentTextScreen(
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
+    onRequestCallScreeningRole: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
+    val prefs = remember { context.getSharedPreferences(BusyReplyPrefs.PREFS_NAME, Context.MODE_PRIVATE) }
     var text by remember {
-        mutableStateOf(prefs.getString(KEY_SAVED_TEXT, "") ?: "")
+        mutableStateOf(prefs.getString(BusyReplyPrefs.KEY_SAVED_TEXT, "") ?: "")
     }
 
     Column(modifier = modifier) {
@@ -86,7 +117,7 @@ fun PersistentTextScreen(
         Spacer(modifier = Modifier.height(16.dp))
         Button(
             onClick = {
-                prefs.edit { putString(KEY_SAVED_TEXT, text) }
+                prefs.edit { putString(BusyReplyPrefs.KEY_SAVED_TEXT, text) }
                 scope.launch {
                     snackbarHostState.showSnackbar("Saved")
                 }
@@ -94,6 +125,15 @@ fun PersistentTextScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Save")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onRequestCallScreeningRole,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Enable call screening")
+            }
         }
     }
 }

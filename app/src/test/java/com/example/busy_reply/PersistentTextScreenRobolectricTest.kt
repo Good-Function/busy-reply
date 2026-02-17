@@ -28,9 +28,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
-private const val PREFS_NAME = "busy_reply_prefs"
-private const val KEY_SAVED_TEXT = "saved_text"
-
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class PersistentTextScreenRobolectricTest {
@@ -76,8 +73,8 @@ class PersistentTextScreenRobolectricTest {
     @Test
     fun prePopulatedPrefs_showsSavedTextOnLoad() {
         val context = RuntimeEnvironment.getApplication()
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
-            putString(KEY_SAVED_TEXT, "Persistence works")
+        context.getSharedPreferences(BusyReplyPrefs.PREFS_NAME, Context.MODE_PRIVATE).edit {
+            putString(BusyReplyPrefs.KEY_SAVED_TEXT, "Persistence works")
         }
 
         setPersistentTextContent()
