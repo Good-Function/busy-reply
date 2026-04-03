@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
@@ -41,6 +42,7 @@ import kotlinx.coroutines.launch
 
 private val BUSY_REPLY_PERMISSIONS = arrayOf(
     android.Manifest.permission.READ_PHONE_STATE,
+    android.Manifest.permission.READ_CONTACTS,
     android.Manifest.permission.SEND_SMS
 )
 
@@ -64,7 +66,8 @@ class MainActivity : ComponentActivity() {
                     PersistentTextScreen(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding),
+                            .padding(innerPadding)
+                            .imePadding(),
                         snackbarHostState = snackbarHostState,
                         onRequestCallScreeningRole = { requestCallScreeningRole() }
                     )
@@ -87,6 +90,7 @@ class MainActivity : ComponentActivity() {
         if (roleManager.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)) return
         startActivity(roleManager.createRequestRoleIntent(RoleManager.ROLE_CALL_SCREENING))
     }
+
 }
 
 @Composable
@@ -111,7 +115,7 @@ fun PersistentTextScreen(
                 .weight(1f)
                 .semantics { testTag = "note_text_field" },
             placeholder = { Text("Enter your text…") },
-            minLines = 5,
+            minLines = 1,
             maxLines = Int.MAX_VALUE
         )
         Spacer(modifier = Modifier.height(16.dp))
