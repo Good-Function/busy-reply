@@ -117,7 +117,7 @@ fun PersistentTextScreen(
                 shape = MaterialTheme.shapes.small
             ) {
                 Text(
-                    text = "Zapisano",
+                    text = "Saved",
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
