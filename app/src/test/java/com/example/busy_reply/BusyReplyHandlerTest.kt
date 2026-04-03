@@ -114,6 +114,18 @@ class BusyReplyHandlerTest {
         assertTrue(mockSmsSender.sent.isEmpty())
     }
 
+    @Test
+    fun whenBusyButReplyWhenBusyDisabled_returnsAllowAndDoesNotSendSms() {
+        val result = handler.handle(
+            callState = TelephonyManager.CALL_STATE_OFFHOOK,
+            destinationAddress = "+15551234567",
+            message = "I'll call you back",
+            replyWhenBusy = false
+        )
+        assertEquals(BusyReplyResult.ALLOW, result)
+        assertTrue(mockSmsSender.sent.isEmpty())
+    }
+
     private class MockSmsSender : SmsSender {
         val sent = mutableListOf<Pair<String, String>>()
         override fun sendSms(destinationAddress: String, message: String) {

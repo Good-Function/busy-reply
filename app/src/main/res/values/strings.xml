@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">busy-reply</string>
+    <string name="missed_call_monitor_channel_name">Missed call reply</string>
+    <string name="missed_call_monitor_channel_description">Keeps call monitoring active for auto-reply after missed calls</string>
+    <string name="missed_call_monitor_notification_title">Busy reply active</string>
+    <string name="missed_call_monitor_notification_text">Monitoring calls for missed-call SMS replies</string>
 </resources>

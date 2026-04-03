@@ -58,8 +58,9 @@ class PersistentTextScreenRobolectricTest {
         setPersistentTextContent()
         composeTestRule.onNodeWithTag("note_text_field").performTextInput("Important note")
         composeTestRule.onNodeWithText("Save").performClick()
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("saved_banner").assertExists()
-        composeTestRule.onNodeWithText("Saved").assertExists()
+        composeTestRule.onNodeWithText("Zapisano").assertExists()
     }
 
     @Test

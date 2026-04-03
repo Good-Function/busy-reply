@@ -2,6 +2,7 @@ package com.example.busy_reply
 
 import android.app.role.RoleManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -9,15 +10,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -29,8 +32,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.dp
@@ -39,17 +44,25 @@ import androidx.core.content.edit
 import com.example.busy_reply.ui.theme.BusyreplyTheme
 import kotlinx.coroutines.delay
 
-private val BUSY_REPLY_PERMISSIONS = arrayOf(
-    android.Manifest.permission.READ_PHONE_STATE,
-    android.Manifest.permission.READ_CONTACTS,
-    android.Manifest.permission.SEND_SMS
-)
+private fun busyReplyPermissions(): Array<String> = buildList {
+    add(android.Manifest.permission.READ_PHONE_STATE)
+    add(android.Manifest.permission.READ_CONTACTS)
+    add(android.Manifest.permission.SEND_SMS)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        add(android.Manifest.permission.POST_NOTIFICATIONS)
+    }
+}.toTypedArray()
+
+private fun Context.hasPermission(permission: String): Boolean =
+    ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
 class MainActivity : ComponentActivity() {
 
     private val requestPermissionsLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ -> }
+    ) { _ ->
+        startMissedCallMonitorIfPermitted()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,10 +85,26 @@ class MainActivity : ComponentActivity() {
         requestCallScreeningRole()
     }
 
-    private fun requestPermissionsIfNeeded() {
-        val missing = BUSY_REPLY_PERMISSIONS.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+    override fun onResume() {
+        super.onResume()
+        startMissedCallMonitorIfPermitted()
+    }
+
+    private fun startMissedCallMonitorIfPermitted() {
+        if (!hasPermission(android.Manifest.permission.READ_PHONE_STATE)) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !hasPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+        ) {
+            return
         }
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, MissedCallMonitorService::class.java)
+        )
+    }
+
+    private fun requestPermissionsIfNeeded() {
+        val missing = busyReplyPermissions().filter { !hasPermission(it) }
         if (missing.isNotEmpty()) requestPermissionsLauncher.launch(missing.toTypedArray())
     }
 
@@ -98,6 +127,12 @@ fun PersistentTextScreen(
     var text by remember {
         mutableStateOf(prefs.getString(BusyReplyPrefs.KEY_SAVED_TEXT, "") ?: "")
     }
+    var replyWhenBusy by remember {
+        mutableStateOf(prefs.getBoolean(BusyReplyPrefs.KEY_REPLY_WHEN_BUSY, true))
+    }
+    var replyMissedCall by remember {
+        mutableStateOf(prefs.getBoolean(BusyReplyPrefs.KEY_REPLY_MISSED_CALL, true))
+    }
     var showSavedBanner by remember { mutableStateOf(false) }
 
     LaunchedEffect(showSavedBanner) {
@@ -107,7 +142,7 @@ fun PersistentTextScreen(
     }
 
     Column(modifier = modifier) {
-        AnimatedVisibility(visible = showSavedBanner) {
+        if (showSavedBanner) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -135,6 +170,27 @@ fun PersistentTextScreen(
             minLines = 1,
             maxLines = Int.MAX_VALUE
         )
+        Spacer(modifier = Modifier.height(12.dp))
+        CheckboxPreferenceRow(
+            label = "Wyślij przy zajętej linii",
+            checked = replyWhenBusy,
+            onCheckedChange = { checked ->
+                replyWhenBusy = checked
+                prefs.edit { putBoolean(BusyReplyPrefs.KEY_REPLY_WHEN_BUSY, checked) }
+            },
+            rowTestTag = "checkbox_busy_row",
+            boxTestTag = "checkbox_busy"
+        )
+        CheckboxPreferenceRow(
+            label = "Wyślij dla nieodebranej rozmowy",
+            checked = replyMissedCall,
+            onCheckedChange = { checked ->
+                replyMissedCall = checked
+                prefs.edit { putBoolean(BusyReplyPrefs.KEY_REPLY_MISSED_CALL, checked) }
+            },
+            rowTestTag = "checkbox_missed_row",
+            boxTestTag = "checkbox_missed"
+        )
         Spacer(modifier = Modifier.height(16.dp))
         Button(
             onClick = {
@@ -145,5 +201,37 @@ fun PersistentTextScreen(
         ) {
             Text("Save")
         }
+    }
+}
+
+@Composable
+private fun CheckboxPreferenceRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    rowTestTag: String,
+    boxTestTag: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = checked,
+                onValueChange = onCheckedChange,
+                role = Role.Checkbox
+            )
+            .semantics { testTag = rowTestTag },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = null,
+            modifier = Modifier.semantics { testTag = boxTestTag }
+        )
+        Text(
+            text = label,
+            modifier = Modifier.padding(start = 4.dp),
+            style = MaterialTheme.typography.bodyLarge
+        )
     }
 }
