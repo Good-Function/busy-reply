@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,18 +18,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -38,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.example.busy_reply.ui.theme.BusyreplyTheme
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 private val BUSY_REPLY_PERMISSIONS = arrayOf(
     android.Manifest.permission.READ_PHONE_STATE,
@@ -58,22 +57,19 @@ class MainActivity : ComponentActivity() {
         requestPermissionsIfNeeded()
         setContent {
             BusyreplyTheme {
-                val snackbarHostState = remember { SnackbarHostState() }
                 Scaffold(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                    snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } }
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
                 ) { innerPadding ->
                     PersistentTextScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding)
-                            .imePadding(),
-                        snackbarHostState = snackbarHostState,
-                        onRequestCallScreeningRole = { requestCallScreeningRole() }
+                            .imePadding()
                     )
                 }
             }
         }
+        requestCallScreeningRole()
     }
 
     private fun requestPermissionsIfNeeded() {
@@ -95,18 +91,39 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun PersistentTextScreen(
-    modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState,
-    onRequestCallScreeningRole: () -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val prefs = remember { context.getSharedPreferences(BusyReplyPrefs.PREFS_NAME, Context.MODE_PRIVATE) }
     var text by remember {
         mutableStateOf(prefs.getString(BusyReplyPrefs.KEY_SAVED_TEXT, "") ?: "")
     }
+    var showSavedBanner by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showSavedBanner) {
+        if (!showSavedBanner) return@LaunchedEffect
+        delay(1_000)
+        showSavedBanner = false
+    }
 
     Column(modifier = modifier) {
+        AnimatedVisibility(visible = showSavedBanner) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+                    .semantics { testTag = "saved_banner" },
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = "Zapisano",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
         OutlinedTextField(
             value = text,
             onValueChange = { text = it },
@@ -122,22 +139,11 @@ fun PersistentTextScreen(
         Button(
             onClick = {
                 prefs.edit { putString(BusyReplyPrefs.KEY_SAVED_TEXT, text) }
-                scope.launch {
-                    snackbarHostState.showSnackbar("Saved")
-                }
+                showSavedBanner = true
             },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Save")
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onRequestCallScreeningRole,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Enable call screening")
-            }
         }
     }
 }

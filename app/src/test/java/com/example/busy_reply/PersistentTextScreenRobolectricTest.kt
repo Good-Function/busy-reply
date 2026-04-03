@@ -3,12 +3,8 @@ package com.example.busy_reply
 import android.content.Context
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assert
@@ -40,14 +36,9 @@ class PersistentTextScreenRobolectricTest {
             val context = RuntimeEnvironment.getApplication()
             CompositionLocalProvider(LocalContext provides context) {
                 BusyreplyTheme {
-                    val snackbarHostState = remember { SnackbarHostState() }
-                    Scaffold(
-                        modifier = Modifier.padding(16.dp),
-                        snackbarHost = { SnackbarHost(snackbarHostState) { Snackbar(it) } }
-                    ) { innerPadding ->
+                    Scaffold(modifier = Modifier.padding(16.dp)) { innerPadding ->
                         PersistentTextScreen(
-                            modifier = Modifier.fillMaxSize().padding(innerPadding),
-                            snackbarHostState = snackbarHostState
+                            modifier = Modifier.fillMaxSize().padding(innerPadding)
                         )
                     }
                 }
@@ -63,10 +54,11 @@ class PersistentTextScreenRobolectricTest {
     }
 
     @Test
-    fun saveButton_showsSavedSnackbar() {
+    fun saveButton_showsSavedBanner() {
         setPersistentTextContent()
         composeTestRule.onNodeWithTag("note_text_field").performTextInput("Important note")
         composeTestRule.onNodeWithText("Save").performClick()
+        composeTestRule.onNodeWithTag("saved_banner").assertExists()
         composeTestRule.onNodeWithText("Saved").assertExists()
     }
 
